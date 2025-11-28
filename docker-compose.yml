@@ -120,6 +120,14 @@ services:
       - '9411:9411'
     networks:
       - app-network
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.zipkin.rule=Host(`leonesii.mooo.com`) && PathPrefix(`/api/zipkin`)'
+      - 'traefik.http.routers.zipkin.entrypoints=websecure'
+      - 'traefik.http.routers.zipkin.tls.certresolver=myresolver'
+      - 'traefik.http.middlewares.zipkin-strip.stripprefix.prefixes=/api/zipkin'
+      - 'traefik.http.middlewares.zipkin-add.addprefix.prefix=/api/v2/spans'
+      - 'traefik.http.routers.zipkin.middlewares=zipkin-strip,zipkin-add'
 
 networks:
   app-network:
