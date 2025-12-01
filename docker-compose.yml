@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   traefik:
-    image: traefik:v2.10
+    image: traefik:v3.6
     command:
       - '--api.insecure=true'
       - '--providers.docker=true'
@@ -24,6 +24,7 @@ services:
 
   frontend:
     build: ./frontend
+    image: frontend:latest
     container_name: frontend
     labels:
       - 'traefik.enable=true'
@@ -39,6 +40,7 @@ services:
 
   auth-api:
     build: ./auth-api
+    image: auth-api:latest
     container_name: auth-api
     environment:
       - USERS_API_ADDRESS=http://users-api:8083
@@ -57,6 +59,7 @@ services:
 
   todos-api:
     build: ./todos-api
+    image: todos-api:latest
     container_name: todos-api
     environment:
       - REDIS_HOST=redis
@@ -79,6 +82,7 @@ services:
 
   users-api:
     build: ./users-api
+    image: users-api:latest
     container_name: users-api
     environment:
       - SERVER_PORT=8083
@@ -96,6 +100,7 @@ services:
 
   log-message-processor:
     build: ./log-message-processor
+    image: log-message-processor:latest
     container_name: log-message-processor
     environment:
       - REDIS_HOST=redis
