@@ -1,4 +1,4 @@
-# Trigger drift detection test 2
+# Trigger drift detection test 
 terraform {
   required_version = ">= 1.0.0"
   backend "local" {
