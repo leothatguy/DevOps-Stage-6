@@ -1,86 +1,139 @@
-# Trigger drift detection test 
 terraform {
-  required_version = ">= 1.0.0"
-  backend "local" {
-    path = "terraform.tfstate"
-  }
+  required_version = ">= 1.5.0"
+  
   required_providers {
-    null = {
-      source = "hashicorp/null"
-      version = "3.2.1"
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
     }
     local = {
-      source = "hashicorp/local"
-      version = "2.4.0"
+      source  = "hashicorp/local"
+      version = "~> 2.4"
+    }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.2"
     }
   }
 }
 
-provider "null" {}
-provider "local" {}
-
-variable "ssh_host" {
-  description = "The public IP of the Server"
-  type        = string
+provider "aws" {
+  region = var.aws_region
 }
 
-variable "ssh_user" {
-  description = "The SSH user"
-  type        = string
-  default     = "root"
-}
+# Data source for Ubuntu AMI
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
 
-variable "ssh_private_key" {
-  description = "Path to the private key file"
-  type        = string
-}
-
-variable "domain_name" {
-  description = "Domain name for the application"
-  type        = string
-  default     = "leonesii.mooo.com"
-}
-
-variable "email" {
-  description = "Email for SSL certificates"
-  type        = string
-  default     = "yhungdew@gmail.com"
-}
-
-resource "null_resource" "vps_provisioner" {
-  triggers = {
-    # Trigger on any change to the ansible playbook or roles
-    playbook_hash = sha256(file("${path.module}/../ansible/playbook.yml"))
-    # Also trigger if variables change
-    host = var.ssh_host
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
 
-  # Provision the server (simulated provisioning since it exists)
-  # Using local-exec to bypass potential Go SSH lib issues since manual SSH works
-  provisioner "local-exec" {
-    command = "ssh -o StrictHostKeyChecking=no -i ${var.ssh_private_key} ${var.ssh_user}@${var.ssh_host} 'echo Server is reachable && uptime'"
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+# Key Pair
+resource "aws_key_pair" "deployer" {
+  key_name   = var.key_name
+  public_key = file(var.public_key_path)
+}
+
+# Security Group
+resource "aws_security_group" "todo_app" {
+  name        = "todo-app-sg"
+  description = "Security group for TODO application"
+
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.ssh_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "todo-app-sg"
+  }
+}
+
+# EC2 Instance
+resource "aws_instance" "todo_app" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.instance_type
+  key_name               = aws_key_pair.deployer.key_name
+  vpc_security_group_ids = [aws_security_group.todo_app.id]
+
+  tags = {
+    Name        = "todo-app-server"
+    Environment = "production"
+    Project     = "hngi13-stage6"
   }
 }
 
 # Generate Ansible Inventory
 resource "local_file" "ansible_inventory" {
   content = templatefile("${path.module}/inventory.tftpl", {
-    host = var.ssh_host
-    user = var.ssh_user
-    key  = var.ssh_private_key
+    host = aws_instance.todo_app.public_ip
+    user = var.server_user
+    key  = var.private_key_path
   })
-  filename = "${path.module}/../ansible/inventory.ini"
+  filename = "${path.module}/../ansible/inventory/hosts.yml"
 }
 
-# Run Ansible after inventory is generated
-resource "null_resource" "run_ansible" {
-  depends_on = [local_file.ansible_inventory, null_resource.vps_provisioner]
-
+# Trigger Ansible Provisioning
+resource "null_resource" "ansible_provision" {
   triggers = {
-    always_run = timestamp()
+    instance_id = aws_instance.todo_app.id
+    inventory   = local_file.ansible_inventory.content
   }
 
   provisioner "local-exec" {
-    command = "ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i ${path.module}/../ansible/inventory.ini ${path.module}/../ansible/playbook.yml --extra-vars 'domain_name=${var.domain_name} email=${var.email}'"
+    command = <<-EOT
+      echo "Waiting for SSH to be available..."
+      # Simple wait loop for SSH
+      for i in {1..30}; do
+        nc -z -w 5 ${aws_instance.todo_app.public_ip} 22 && break
+        echo "Waiting for port 22..."
+        sleep 10
+      done
+
+      echo "Running Ansible playbook..."
+      # Set strict host key checking to no to avoid interactive prompt
+      export ANSIBLE_HOST_KEY_CHECKING=False
+      ansible-playbook -i ${path.module}/../ansible/inventory/hosts.yml ${path.module}/../ansible/playbook.yml
+    EOT
   }
+
+  depends_on = [
+    aws_instance.todo_app,
+    local_file.ansible_inventory
+  ]
 }

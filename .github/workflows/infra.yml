@@ -11,6 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       drift_detected: ${{ steps.plan.outputs.exitcode == 2 }}
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: 'us-east-1'
+
     steps:
       - uses: actions/checkout@v3
 
@@ -22,6 +27,10 @@ jobs:
       - name: Terraform Init
         run: terraform init
         working-directory: infra/terraform
+        env:
+          # If using S3 backend, credentials are auto-picked up from env
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Terraform Plan
         id: plan
@@ -39,9 +48,8 @@ jobs:
           fi
         working-directory: infra/terraform
         env:
-          TF_VAR_ssh_host: ${{ secrets.SSH_HOST }}
-          TF_VAR_ssh_user: ${{ secrets.SSH_USER }}
-          TF_VAR_ssh_private_key: 'key.pem'
+          TF_VAR_public_key_path: 'deployer_key.pub'
+          TF_VAR_private_key_path: 'deployer_key'
 
       - name: Send Email on Drift
         if: steps.plan.outputs.exitcode == 2
@@ -51,8 +59,17 @@ jobs:
           server_port: 465
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: 'Terraform Drift Detected'
-          body: 'Drift detected in infrastructure. Please review and approve.'
+          subject: '⚠️ Terraform Drift Detected: Action Required'
+          html_body: |
+            <h3>Terraform Drift Detected</h3>
+            <p>Changes have been detected in your infrastructure state for <b>${{ github.repository }}</b>.</p>
+            <p>Please review the Terraform plan and approve the deployment to apply changes.</p>
+            <p>
+              <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" style="background-color: #2ea44f; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                View Plan & Approve
+              </a>
+            </p>
+            <p>Or click here: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}</p>
           to: ${{ secrets.MAIL_TO }}
           from: GitHub Actions
 
@@ -60,26 +77,31 @@ jobs:
     needs: terraform-plan
     if: needs.terraform-plan.outputs.drift_detected == 'true'
     runs-on: ubuntu-latest
-    environment: production # Requires manual approval in GitHub
+    environment: production
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: 'us-east-1'
     steps:
       - uses: actions/checkout@v3
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
 
-      - name: Create SSH Key
+      - name: Create SSH Keys
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > infra/terraform/key.pem
-          chmod 600 infra/terraform/key.pem
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > infra/terraform/deployer_key.pub
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > infra/terraform/deployer_key
+          chmod 600 infra/terraform/deployer_key
+        # We need the public key for aws_key_pair and private key for Ansible (if triggered)
 
       - name: Terraform Init
         run: terraform init
         working-directory: infra/terraform
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve tfplan
         working-directory: infra/terraform
         env:
-          TF_VAR_ssh_host: ${{ secrets.SSH_HOST }}
-          TF_VAR_ssh_user: ${{ secrets.SSH_USER }}
-          TF_VAR_ssh_private_key: 'key.pem'
+          TF_VAR_public_key_path: 'deployer_key.pub'
+          TF_VAR_private_key_path: 'deployer_key'

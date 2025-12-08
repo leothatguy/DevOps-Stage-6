@@ -10,7 +10,7 @@ services:
       - '--entrypoints.web.address=:80'
       - '--entrypoints.websecure.address=:443'
       - '--certificatesresolvers.myresolver.acme.tlschallenge=true'
-      - '--certificatesresolvers.myresolver.acme.email=yhungdew@gmail.com'
+      - '--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}'
       - '--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json'
     ports:
       - '80:80'
@@ -28,10 +28,10 @@ services:
     container_name: frontend
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.frontend.rule=Host(`leonesii.mooo.com`)'
+      - 'traefik.http.routers.frontend.rule=Host(`${DOMAIN_NAME}`)'
       - 'traefik.http.routers.frontend.entrypoints=websecure'
       - 'traefik.http.routers.frontend.tls.certresolver=myresolver'
-      - 'traefik.http.routers.frontend-http.rule=Host(`leonesii.mooo.com`)'
+      - 'traefik.http.routers.frontend-http.rule=Host(`${DOMAIN_NAME}`)'
       - 'traefik.http.routers.frontend-http.entrypoints=web'
       - 'traefik.http.routers.frontend-http.middlewares=https-redirect'
       - 'traefik.http.middlewares.https-redirect.redirectscheme.scheme=https'
@@ -49,7 +49,7 @@ services:
       - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.auth-api.rule=Host(`leonesii.mooo.com`) && PathPrefix(`/api/auth`)'
+      - 'traefik.http.routers.auth-api.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/api/auth`)'
       - 'traefik.http.routers.auth-api.entrypoints=websecure'
       - 'traefik.http.routers.auth-api.tls.certresolver=myresolver'
       - 'traefik.http.middlewares.auth-strip.stripprefix.prefixes=/api/auth'
@@ -70,7 +70,7 @@ services:
       - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.todos-api.rule=Host(`leonesii.mooo.com`) && PathPrefix(`/api/todos`)'
+      - 'traefik.http.routers.todos-api.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/api/todos`)'
       - 'traefik.http.routers.todos-api.entrypoints=websecure'
       - 'traefik.http.routers.todos-api.tls.certresolver=myresolver'
       - 'traefik.http.middlewares.todos-strip.stripprefix.prefixes=/api'
@@ -90,7 +90,7 @@ services:
       - SPRING_ZIPKIN_BASE_URL=http://zipkin:9411/
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.users-api.rule=Host(`leonesii.mooo.com`) && PathPrefix(`/api/users`)'
+      - 'traefik.http.routers.users-api.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/api/users`)'
       - 'traefik.http.routers.users-api.entrypoints=websecure'
       - 'traefik.http.routers.users-api.tls.certresolver=myresolver'
       - 'traefik.http.middlewares.users-strip.stripprefix.prefixes=/api'
@@ -127,7 +127,7 @@ services:
       - app-network
     labels:
       - 'traefik.enable=true'
-      - 'traefik.http.routers.zipkin.rule=Host(`leonesii.mooo.com`) && PathPrefix(`/api/zipkin`)'
+      - 'traefik.http.routers.zipkin.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/api/zipkin`)'
       - 'traefik.http.routers.zipkin.entrypoints=websecure'
       - 'traefik.http.routers.zipkin.tls.certresolver=myresolver'
       - 'traefik.http.middlewares.zipkin-strip.stripprefix.prefixes=/api/zipkin'
