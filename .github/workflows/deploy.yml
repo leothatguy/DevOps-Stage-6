@@ -29,7 +29,7 @@ jobs:
       - name: Get Server IP
         id: get-ip
         run: |
-          IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=todo-app-server" "Name=instance-state-name,Values=running" --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
+          IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=todo-app-server-v2" "Name=instance-state-name,Values=running" --query "Reservations[*].Instances[*].PublicIpAddress" --output text)
           echo "SERVER_IP=$IP" >> $GITHUB_ENV
 
       - name: Deploy via Ansible
