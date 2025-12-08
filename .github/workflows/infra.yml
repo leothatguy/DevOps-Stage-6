@@ -57,6 +57,12 @@ jobs:
           TF_VAR_public_key_path: 'deployer_key.pub'
           TF_VAR_private_key_path: 'deployer_key'
 
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfplan
+          path: infra/terraform/tfplan
+
       - name: Send Email on Drift
         if: steps.plan.outputs.exitcode == 2
         uses: dawidd6/action-send-mail@v3
@@ -104,6 +110,12 @@ jobs:
       - name: Terraform Init
         run: terraform init
         working-directory: infra/terraform
+
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v3
+        with:
+          name: tfplan
+          path: infra/terraform
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
