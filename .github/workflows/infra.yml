@@ -58,7 +58,7 @@ jobs:
           TF_VAR_private_key_path: 'deployer_key'
 
       - name: Upload Terraform Plan
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tfplan
           path: infra/terraform/tfplan
@@ -112,7 +112,7 @@ jobs:
         working-directory: infra/terraform
 
       - name: Download Terraform Plan
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: tfplan
           path: infra/terraform
