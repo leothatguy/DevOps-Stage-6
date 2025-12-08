@@ -43,3 +43,5 @@ jobs:
             ${{ env.SERVER_IP }} ansible_user=ubuntu
           options: |
             --extra-vars "domain_name=${{ secrets.DOMAIN_NAME }} email=${{ secrets.ACME_EMAIL }}"
+        env:
+          ANSIBLE_CONFIG: infra/ansible/ansible.cfg

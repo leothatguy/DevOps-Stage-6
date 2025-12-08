@@ -93,7 +93,7 @@ resource "aws_instance" "todo_app" {
   vpc_security_group_ids = [aws_security_group.todo_app.id]
 
   tags = {
-    Name        = "todo-app-server"
+    Name        = "todo-app-server-v2"
     Environment = "production"
     Project     = "hngi13-stage6"
   }
@@ -129,6 +129,7 @@ resource "null_resource" "ansible_provision" {
       echo "Running Ansible playbook..."
       # Set strict host key checking to no to avoid interactive prompt
       export ANSIBLE_HOST_KEY_CHECKING=False
+      export ANSIBLE_CONFIG=${path.module}/../ansible/ansible.cfg
       ansible-playbook -i ${path.module}/../ansible/inventory/hosts.yml ${path.module}/../ansible/playbook.yml --extra-vars "domain_name=${var.domain_name} email=${var.email}"
     EOT
   }
