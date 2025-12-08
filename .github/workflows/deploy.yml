@@ -1,6 +1,10 @@
 name: Application Deployment
 
 on:
+  workflow_run:
+    workflows: ['Infrastructure Pipeline']
+    types:
+      - completed
   push:
     paths:
       - 'frontend/**'
